@@ -173,14 +173,15 @@ export default function Test8() {
     if (!canvas) return;
 
     // Initialize GlslCanvas
-    import('glslcanvas').then(({ default: GlslCanvas }) => {
+    import('glslCanvas/dist/GlslCanvas.es.js').then((mod) => {
+      const GlslCanvas = mod && (mod.default || mod.GlslCanvas) || mod;
       sandboxRef.current = new GlslCanvas(canvas);
       sandboxRef.current.load(fragmentShader);
       
       // Load the image from public folder
       loadImageFromPublic();
     }).catch(err => {
-      console.error('Failed to load glslCanvas:', err);
+      console.error('Failed to load glslCanvas dist build:', err);
     });
 
     return () => {
@@ -670,7 +671,7 @@ export default function Test8() {
             <button
               onClick={startAudio}
               style={{
-                color: 'white', cursor: 'pointer',
+                // color: 'white', cursor: 'pointer',
                 width : "960px", height : "640px",
                 display: startCounter >= 5 ? 'block' : 'none',
                 color : "transparent",
