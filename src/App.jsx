@@ -14,7 +14,7 @@ import Test6 from './Test6';
 import Ending from './Ending';
 import RippleGrid from './RippleGrid';
 import Test7 from './Test7';
-import WebCamThumbnail from './WebCamThumbnail';
+// import WebCamThumbnail from './WebCamThumbnail';
 import Test8 from './Test8';
 
 export default function App() {
@@ -28,7 +28,7 @@ export default function App() {
       {/* <Ending/> */}
       {/* <Test6/> */}
       {/* <Test7/> */}
-      <WebCamThumbnail />
+      {/* <WebCamThumbnail /> */}
         
       <Routes> 
         <Route path = "/" element = { <Test8/> } />
