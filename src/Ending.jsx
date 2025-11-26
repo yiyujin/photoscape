@@ -6,14 +6,14 @@ import * as Tone from 'tone';
 import { settingsData } from './SettingsNavigator';
 
 export default function Ending() {
-    const width = 960;
-    const height = 640;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
     
     const gapRow = 20; // gap between rows
     const gapCol = 64; // gap between columns
 
     return(
-        <div style = { { position : "relative", background : "", width : width, height : height, display : "flex", justifyContent : "center", alignItems : "center" } }>
+        <div style = { {  height: "100%", overflow: "hidden", position : "relative", background : "", width : width, height : height, display : "flex", justifyContent : "center", alignItems : "center" } }>
             {/* <img src = "/ending.jpg" style={{zIndex : -1, position: 'absolute', width: width, height: height }}/> */}
                         
             <ButtonGrid rows = { 4}  cols = { 3 } gapRow={gapRow} gapCol={gapCol}>
