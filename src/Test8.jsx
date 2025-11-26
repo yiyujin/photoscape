@@ -674,7 +674,7 @@ export default function Test8() {
                 width : "960px", height : "640px",
                 display: startCounter >= 5 ? 'block' : 'none',
                 color : "transparent",
-                background : "transparent",
+                // background : "transparent",
               }}
             />
           )}
