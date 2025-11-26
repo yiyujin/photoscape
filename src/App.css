@@ -1,0 +1,31 @@
+body {
+    background : black;
+}
+
+/* * {
+  cursor: none;
+} */
+
+button {
+    cursor : none;
+    border : none;
+    border-radius: 2%;
+}
+
+button:hover {
+    background : none;
+    outline : none;
+    border : none;
+}
+
+button:focus {
+    background : none;
+    outline : none;
+    border : none;
+}
+
+@keyframes oscillateOpacity {
+  0% { opacity: 0.2; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.2; }
+}
