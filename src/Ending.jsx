@@ -57,7 +57,8 @@ function PlayButton({ index, onPlayed }) {
         };
     }, []);
 
-    const handleClick = async () => {
+    const handleStart = async (e) => {
+        try { if (e && e.preventDefault) e.preventDefault(); } catch (e) {}
         // visual feedback: set active (opacity 1.0) briefly
         setActive(true);
         if (activeTimeoutRef.current) clearTimeout(activeTimeoutRef.current);
@@ -79,10 +80,11 @@ function PlayButton({ index, onPlayed }) {
         const note = `${map.note}${octave}`;
         if (samplerRef.current && ready) {
             try {
+                // play note — sampler supports polyphony, and each button has its own sampler
                 samplerRef.current.triggerAttackRelease(note, '1n');
                 if (typeof onPlayed === 'function') onPlayed(note);
-            } catch (e) {
-                console.warn('play error', e);
+            } catch (err) {
+                console.warn('play error', err);
             }
         }
     };
@@ -94,7 +96,9 @@ function PlayButton({ index, onPlayed }) {
 
     return (
         <button
-            onClick={handleClick}
+            onPointerDown={handleStart}
+            onTouchStart={handleStart}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { handleStart(); } }}
             style={{
                 padding: '12px 18px',
                 background: 'transparent',
@@ -106,6 +110,8 @@ function PlayButton({ index, onPlayed }) {
                 opacity: active ? 1.0 : 0.5,
                 transition: 'opacity 160ms ease',
                 backgroundImage : `url(/buttons/${index}.png)`,
+                touchAction: 'none',
+                userSelect: 'none',
             }}
         >
         </button>
