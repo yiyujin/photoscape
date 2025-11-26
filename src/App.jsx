@@ -20,7 +20,8 @@ export default function App() {
         
       <Routes> 
         {/* <Route path = "/" element = { <Test8/> } /> */}
-        <Route path = "/ending" element = { <Ending/>}/>
+        {/* <Route path = "/ending" element = { <Ending/>}/> */}
+        <Route path = "/" element = { <Ending/>}/>
       </Routes>
       
     </div>
