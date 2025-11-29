@@ -13,7 +13,7 @@ export default function Ending() {
     const gapCol = 64; // gap between columns
 
     return(
-        <div style = { {  height: "100%", overflow: "hidden", position : "relative", background : "", width : width, height : height, display : "flex", justifyContent : "center", alignItems : "center" } }>
+        <div style = { { overflow: "hidden", position : "relative", background : "", width : width, height : height, display : "flex", justifyContent : "center", alignItems : "center" } }>
             {/* <img src = "/ending.jpg" style={{zIndex : -1, position: 'absolute', width: width, height: height }}/> */}
                         
             <ButtonGrid rows = { 4}  cols = { 3 } gapRow={gapRow} gapCol={gapCol}>

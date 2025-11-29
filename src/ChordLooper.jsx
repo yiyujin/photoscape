@@ -117,7 +117,7 @@ export default function ChordLooper() {
         right : 0,
         width : "200px",
         height : "200px",
-        background : "transparent",
+        // background : "transparent",
         zIndex: 9999,
       }}
     >
