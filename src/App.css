@@ -1,10 +1,10 @@
-body {
-    background : black;
+html, body {
+  background : black;
+
+  overflow: hidden;
+  touch-action: none; /* prevents scrolling, keeps touch events */
 }
 
-/* * {
-  cursor: none;
-} */
 
 button {
     cursor : none;
