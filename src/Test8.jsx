@@ -27,7 +27,6 @@ export default function Test8() {
   const activeAnimationsRef = useRef([]);
   const mouseDownRef = useRef(false);
   const activePointersRef = useRef(new Map());
-  const touchMarkersRef = useRef(new Map()); // touch identifier -> {x,y}
   const animationFrameRef = useRef(null);
   const animationStartedRef = useRef(false);
   const currentNoteRef = useRef(null);
@@ -615,23 +614,6 @@ export default function Test8() {
           ctx.fillText(`b:${b.toFixed(2)}`, dx + 56, dy - 8);
         ctx.restore();
       }
-      // draw any active touch markers on top (always draw, even if grid hidden)
-      try {
-        for (const [id, p] of touchMarkersRef.current.entries()) {
-          if (!p) continue;
-          ctx.beginPath();
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-          ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-          ctx.lineWidth = 2;
-          const cx = p.x + 0.5; const cy = p.y + 0.5;
-          ctx.arc(cx, cy, 12, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-          ctx.fillStyle = 'rgba(0,0,0,0.9)';
-          ctx.font = '10px monospace';
-          ctx.fillText(String(id), cx - 4, cy + 4);
-        }
-      } catch (e) {}
     }
   };
 
@@ -1061,8 +1043,6 @@ export default function Test8() {
       const id = t.identifier;
       // register pointer-like state
       activePointersRef.current.set(id, { lastCellKey: null, note: null });
-      // add visual marker
-      try { touchMarkersRef.current.set(id, { x: t.clientX - rect.left, y: t.clientY - rect.top }); } catch (e) {}
       const px = t.clientX - rect.left;
       const py = t.clientY - rect.top;
 
@@ -1073,8 +1053,6 @@ export default function Test8() {
         }
       }
     }
-    // redraw overlay to show markers
-    try { drawGrid(); } catch (e) {}
   };
 
   const handleTouchMove = (e) => {
@@ -1089,7 +1067,6 @@ export default function Test8() {
       const id = t.identifier;
       const px = t.clientX - rect.left;
       const py = t.clientY - rect.top;
-      try { touchMarkersRef.current.set(id, { x: px, y: py }); } catch (e) {}
 
       for (let cell of dataRef.current) {
         if (px >= cell.x && px < cell.x + gridDensity && py >= cell.y && py < cell.y + gridDensity) {
@@ -1098,7 +1075,6 @@ export default function Test8() {
         }
       }
     }
-    try { drawGrid(); } catch (e) {}
   };
 
   const handleTouchEnd = (e) => {
@@ -1115,70 +1091,17 @@ export default function Test8() {
         }
       } catch (err) {}
       activePointersRef.current.delete(id);
-      try { touchMarkersRef.current.delete(id); } catch (e) {}
     }
 
     if (activePointersRef.current.size === 0) {
       lastCellRef.current = null;
       mouseDownRef.current = false;
     }
-    try { drawGrid(); } catch (e) {}
   };
 
   const handleTouchCancel = (e) => {
     try { handleTouchEnd(e); } catch (err) {}
   };
-
-  // Attach non-passive native touch listeners to ensure preventDefault() works
-  // and we receive move events on platforms where React's synthetic handlers
-  // may be passive or otherwise interfered with by the browser.
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const start = (ev) => handleTouchStart(ev);
-    const move = (ev) => handleTouchMove(ev);
-    const end = (ev) => handleTouchEnd(ev);
-    const cancel = (ev) => handleTouchCancel(ev);
-
-    canvas.addEventListener('touchstart', start, { passive: false });
-    canvas.addEventListener('touchmove', move, { passive: false });
-    canvas.addEventListener('touchend', end, { passive: false });
-    canvas.addEventListener('touchcancel', cancel, { passive: false });
-
-    return () => {
-      try {
-        canvas.removeEventListener('touchstart', start);
-        canvas.removeEventListener('touchmove', move);
-        canvas.removeEventListener('touchend', end);
-        canvas.removeEventListener('touchcancel', cancel);
-      } catch (e) {}
-    };
-  }, [imageLoaded]);
-
-  // Stronger fallback: document-level non-passive listeners so gestures
-  // are captured even if some ancestor steals them. This is a last-resort
-  // fallback and will only be attached when the component mounts.
-  useEffect(() => {
-    const dstart = (ev) => handleTouchStart(ev);
-    const dmove = (ev) => handleTouchMove(ev);
-    const dend = (ev) => handleTouchEnd(ev);
-    const dcancel = (ev) => handleTouchCancel(ev);
-
-    document.addEventListener('touchstart', dstart, { passive: false });
-    document.addEventListener('touchmove', dmove, { passive: false });
-    document.addEventListener('touchend', dend, { passive: false });
-    document.addEventListener('touchcancel', dcancel, { passive: false });
-
-    return () => {
-      try {
-        document.removeEventListener('touchstart', dstart);
-        document.removeEventListener('touchmove', dmove);
-        document.removeEventListener('touchend', dend);
-        document.removeEventListener('touchcancel', dcancel);
-      } catch (e) {}
-    };
-  }, []);
 
   // Clear pending release timers and any held notes on unmount to avoid
   // dangling timers or sounds after component is removed.
@@ -1285,8 +1208,7 @@ export default function Test8() {
             WebkitTouchCallout: 'none',
             WebkitUserSelect: 'none',
             userSelect: 'none',
-            WebkitUserDrag: 'none',
-            overscrollBehavior: 'none'
+            WebkitUserDrag: 'none'
           }}
         />
         
