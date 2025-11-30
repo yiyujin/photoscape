@@ -114,9 +114,10 @@ export default function ChordLooper() {
         width: "200px",
         height: "200px",
         zIndex: 9999,
+        background : "transparent",
       }}
     >
-      {playing ? 'Stop Chords' : 'Play Chords'}
+      {/* {playing ? 'Stop Chords' : 'Play Chords'} */}
     </button>
   );
 }
