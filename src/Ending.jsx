@@ -6,11 +6,15 @@ import { settingsData } from './SettingsNavigator';
 
 export default function Ending() {
     // Ensure audio context is unlocked on first user gesture while on Ending
+    const [audioUnlocked, setAudioUnlocked] = useState(false);
     useEffect(() => {
         const unlock = async (e) => {
             try { if (e && e.preventDefault) e.preventDefault(); } catch (e) {}
             try {
                 await Tone.start();
+                // notify any PlayButtons to prime themselves
+                try { document.dispatchEvent(new CustomEvent('AudioUnlocked')); } catch (e) {}
+                setAudioUnlocked(true);
             } catch (err) {}
         };
 
@@ -38,6 +42,24 @@ export default function Ending() {
             alignItems : "center"
         }}>
             <ButtonGrid rows={4} cols={3} gapRow={gapRow} gapCol={gapCol}>
+                {/* Manual loader for touch devices: if automatic unlock didn't happen, allow user to tap here to enable audio */}
+                {!audioUnlocked && (
+                    <div style={{ position: 'absolute', right: 8, top: 8, zIndex: 999 }}>
+                        <button onClick={async (e) => {
+                            try { if (e && e.preventDefault) e.preventDefault(); } catch (err) {}
+                            try { await Tone.start(); } catch (err) {}
+                            try { document.dispatchEvent(new CustomEvent('AudioUnlocked')); } catch (e) {}
+                            setAudioUnlocked(true);
+                        }} style={{ 
+                            fontSize: 14, cursor: 'pointer',
+                            background : "red",
+                            width : "960px",
+                            height : "640px",
+                        }}>
+                            Load Audio
+                        </button>
+                    </div>
+                )}
                 { Array.from({ length: 12 }).map((_, i) => (
                     <PlayButton
                         key={i}
@@ -113,7 +135,17 @@ function PlayButton({ index, onPlayed }) {
                     samplerRef.current.dispose();
                 } catch (e) {}
             }
+            try { document.removeEventListener('AudioUnlocked', prime); } catch (e) {}
         };
+    }, []);
+
+    useEffect(() => {
+        // Listen for explicit unlock event and attempt to prime when it happens
+        const onUnlock = () => {
+            try { prime(); } catch (e) {}
+        };
+        document.addEventListener('AudioUnlocked', onUnlock);
+        return () => document.removeEventListener('AudioUnlocked', onUnlock);
     }, []);
 
     const handleStart = async (e) => {
