@@ -11,11 +11,33 @@ export default function Ending() {
     const width = window.innerWidth;
     const height = window.innerHeight;
 
+    // Ensure audio context is unlocked on first user gesture while on Ending
+    useEffect(() => {
+        const unlock = async (e) => {
+            try { if (e && e.preventDefault) e.preventDefault(); } catch (e) {}
+            try {
+                await Tone.start();
+                // once unlocked, remove listeners (we used once:true below too)
+            } catch (err) {
+                // ignore
+            }
+        };
+
+        // Use capture + once to ensure this runs before child handlers and only once.
+        document.addEventListener('pointerdown', unlock, { once: true, capture: true });
+        document.addEventListener('touchstart', unlock, { once: true, passive: false, capture: true });
+
+        return () => {
+            try { document.removeEventListener('pointerdown', unlock, { capture: true }); } catch (e) {}
+            try { document.removeEventListener('touchstart', unlock, { capture: true }); } catch (e) {}
+        };
+    }, []);
+
     const gapRow = 20; // gap between rows
     const gapCol = 64; // gap between columns
 
     return(
-        <div style = { { overflow: "hidden", position : "relative", background : "", width : width, height : height, display : "flex", justifyContent : "center", alignItems : "center" } }>
+        <div style = { { justifyContent : "center", width : "960px", height : "640px", background : "red", overflow: "hidden", position : "relative", display : "flex", alignItems : "center" } }>
             {/* <TempoControl bpm={bpm} onChange={handleBpmChange} /> */}
             {/* <img src = "/ending.jpg" style={{zIndex : -1, position: 'absolute', width: width, height: height }}/> */}
                         

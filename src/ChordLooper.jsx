@@ -11,8 +11,10 @@ export default function ChordLooper() {
 
   async function startLoop() {
     await Tone.start();
+
+    // Load sampler once
     if (!synthRef.current) {
-      synthRef.current = new Tone.Sampler({
+      const sampler = new Tone.Sampler({
         urls: {
           C4: 'C4.mp3',
           'D#4': 'Ds4.mp3',
@@ -21,6 +23,9 @@ export default function ChordLooper() {
         },
         baseUrl: 'https://tonejs.github.io/audio/salamander/'
       }).toDestination();
+
+      await sampler.loaded;  // important
+      synthRef.current = sampler;
     }
 
     const chord1 = ['Bb3', 'D4', 'F4'];
@@ -28,8 +33,9 @@ export default function ChordLooper() {
     const chord3 = ['Bb3', 'D3', 'F4'];
     const chord4 = ['G3', 'Bb3', 'Eb4'];
 
+    // FIX: schedule first chord slightly after measure start
     const events = [
-      ['0', chord1],
+      ['0:0:1', chord1], // <-- prevents Tone from dropping the first event
       ['1m', chord2],
       ['2m', chord3],
       ['3m', chord4],
@@ -47,20 +53,12 @@ export default function ChordLooper() {
     part.loopEnd = '4m';
     partRef.current = part;
 
-    // If Transport is already running we want the first chord to play immediately.
-    // Instead of restarting the Transport (which could affect other audio),
-    // trigger the first chord manually right away, and schedule the Part to
-    // continue looping from the current transport position.
+    // Start from top always
     if (Tone.Transport.state === 'started') {
-      // schedule the part to start at the next measure boundary of the transport
-      const nextMeasure = Tone.Transport.seconds + 0.01;
-      part.start(nextMeasure);
-      // trigger chord1 immediately so user hears the first measure now
-      try { synthRef.current.triggerAttackRelease(chord1, '1m', Tone.now()); } catch (e) {}
+      part.start(Tone.now(), 0);
     } else {
-      // transport not running: start the Part at time 0 and start the transport
       part.start(0);
-      try { Tone.Transport.start(); } catch (e) {}
+      Tone.Transport.start();
     }
   }
 
@@ -72,13 +70,11 @@ export default function ChordLooper() {
         partRef.current = null;
       }
     } catch (e) {}
-    // Keep the Transport running (do not stop it here) to avoid interfering
-    // with other scheduled audio; callers can stop Transport if needed.
   }
 
   async function toggle() {
     const shouldPlay = !playingRef.current;
-    // flip native ref first so repeated clicks are reliable
+
     playingRef.current = shouldPlay;
     setPlaying(shouldPlay);
 
@@ -112,12 +108,11 @@ export default function ChordLooper() {
     <button
       onClick={toggle}
       style={{
-        position : "absolute",
-        bottom : 0,
-        right : 0,
-        width : "200px",
-        height : "200px",
-        // background : "transparent",
+        position: "absolute",
+        bottom: 0,
+        right: 0,
+        width: "200px",
+        height: "200px",
         zIndex: 9999,
       }}
     >

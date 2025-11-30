@@ -14,22 +14,23 @@ const data = [
     colorToMap: {
       red: { note: "Bb", octave: "3", brightness: 0.2 },
       green: { note: "D", octave: "4", brightness: 0.5 },
-      blue: { note: "F", octave: "4", brightness: 0.8 },
+      blue: { note: "F", octave: "4", brightness: 0.8 }, // A C
     },
   },
   {
     img: "/img1.jpg",
     ambient: "/img1.mp3",
+    instrument: 'piano',
     colorToMap: {
       red: { note: "A", octave: "3", brightness: 0.1 },
       green: { note: "C", octave: "4", brightness: 0.6 },
-      blue: { note: "F", octave: "4", brightness: 0.4 },
+      blue: { note: "F", octave: "4", brightness: 0.4 }, // G Bb D Eb
     },
   },
   {
     img: "/img2.jpg",
     ambient: "/img2.mp3",
-    instrument: 'sine',
+    instrument: 'piano',
     colorToMap: {
       red: { note: "G", octave: "3", brightness: 0.3 },
       green: { note: "Bb", octave: "3", brightness: 0.45 },
@@ -39,7 +40,7 @@ const data = [
   {
     img: "/img3.jpg",
     ambient: "/img3.mp3",
-    instrument: 'sine',
+    instrument: 'piano',
     colorToMap: {
       red: { note: "G", octave: "3", brightness: 0.6 },
       green: { note: "Bb", octave: "3", brightness: 0.25 },
