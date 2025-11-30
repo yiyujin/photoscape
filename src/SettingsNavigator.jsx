@@ -39,7 +39,7 @@ const data = [
   {
     img: "/img3.jpg",
     ambient: "/img3.mp3",
-    instrument: 'metal',
+    instrument: 'sine',
     colorToMap: {
       red: { note: "G", octave: "3", brightness: 0.6 },
       green: { note: "Bb", octave: "3", brightness: 0.25 },
