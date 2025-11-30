@@ -52,11 +52,12 @@ export default function Ending() {
                             setAudioUnlocked(true);
                         }} style={{ 
                             fontSize: 14, cursor: 'pointer',
-                            background : "red",
                             width : "960px",
                             height : "640px",
+                            // background : "red",
+                            background : "transparent"
                         }}>
-                            Load Audio
+                            {/* Manually Load Audio */}
                         </button>
                     </div>
                 )}
