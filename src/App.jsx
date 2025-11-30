@@ -2,7 +2,7 @@ import './App.css';
 import { Navigate, Routes, Route } from "react-router-dom";
 
 import Ending from './Ending';
-// import WebCamThumbnail from './WebCamThumbnail';
+import WebCamThumbnail from './WebCamThumbnail';
 import Test8 from './Test8';
 
 export default function App() {

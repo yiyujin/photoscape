@@ -121,7 +121,7 @@ export default function ChordLooper() {
         zIndex: 9999,
       }}
     >
-      {/* {playing ? 'Stop Chords' : 'Play Chords'} */}
+      {playing ? 'Stop Chords' : 'Play Chords'}
     </button>
   );
 }

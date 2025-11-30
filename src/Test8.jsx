@@ -26,10 +26,51 @@ export default function Test8() {
   const selectedCellRef = useRef(null);
   const activeAnimationsRef = useRef([]);
   const mouseDownRef = useRef(false);
+  const activePointersRef = useRef(new Map());
   const animationFrameRef = useRef(null);
   const animationStartedRef = useRef(false);
   const currentNoteRef = useRef(null);
   const lastCellRef = useRef(null);
+  const activeNotesRef = useRef(new Map()); // note -> count of holders
+  const releaseTimersRef = useRef(new Map()); // note -> timer id
+  const CROSSFADE_MS = 120;
+
+  const incNoteCount = (note) => {
+    if (!note) return;
+    const m = activeNotesRef.current;
+    const c = m.get(note) || 0;
+    m.set(note, c + 1);
+    // clear any pending release for this note
+    if (releaseTimersRef.current.has(note)) {
+      clearTimeout(releaseTimersRef.current.get(note));
+      releaseTimersRef.current.delete(note);
+    }
+  };
+
+  const decNoteCount = (note, immediate = false) => {
+    if (!note) return;
+    const m = activeNotesRef.current;
+    const c = m.get(note) || 0;
+    if (c <= 1) {
+      m.delete(note);
+      // schedule release
+      if (releaseTimersRef.current.has(note)) {
+        clearTimeout(releaseTimersRef.current.get(note));
+        releaseTimersRef.current.delete(note);
+      }
+      if (immediate) {
+        try { safeTriggerRelease(synthRef.current, note); } catch (e) {}
+      } else {
+        const t = setTimeout(() => {
+          try { safeTriggerRelease(synthRef.current, note); } catch (e) {}
+          releaseTimersRef.current.delete(note);
+        }, CROSSFADE_MS);
+        releaseTimersRef.current.set(note, t);
+      }
+    } else {
+      m.set(note, c - 1);
+    }
+  };
 
   const rippleRef = useRef(null);
 
@@ -66,6 +107,80 @@ export default function Test8() {
     green: { note: 'Bb', baseOctave: 3 },
     blue: { note: 'Eb', baseOctave: 4 },
   });
+
+  // Helpers to safely play/release notes on different Tone instruments.
+  const safeTriggerAttack = (inst, note) => {
+    if (!inst || !note) return;
+    const doTrigger = () => {
+      try {
+        if (typeof inst.triggerAttack === 'function') {
+          inst.triggerAttack(note);
+        } else if (typeof inst.triggerAttackRelease === 'function') {
+          // fallback to immediate attack+release with a short sustain
+          inst.triggerAttackRelease(note, '1n');
+        } else if (typeof inst.pluck === 'function') {
+          // PluckSynth uses `pluck`
+          inst.pluck(note);
+        } else if (typeof inst.trigger === 'function') {
+          inst.trigger('attack', note);
+        }
+        return true;
+      } catch (e) {
+        // If the sampler buffer hasn't loaded yet, Tone will throw an error
+        // like "buffer is either not set or not loaded". In that case, wait
+        // for Tone.loaded() and retry once. Other errors are logged.
+        const msg = (e && e.message) ? e.message.toLowerCase() : String(e).toLowerCase();
+        if (msg.includes('buffer') || msg.includes('not set') || msg.includes('not loaded')) {
+          Tone.loaded().then(() => {
+            try {
+              if (!inst) return;
+              if (typeof inst.triggerAttack === 'function') {
+                inst.triggerAttack(note);
+              } else if (typeof inst.triggerAttackRelease === 'function') {
+                inst.triggerAttackRelease(note, '1n');
+              } else if (typeof inst.pluck === 'function') {
+                inst.pluck(note);
+              } else if (typeof inst.trigger === 'function') {
+                inst.trigger('attack', note);
+              }
+            } catch (e2) {
+              console.warn('safeTriggerAttack retry failed', e2);
+            }
+          }).catch(() => {});
+        } else {
+          console.warn('safeTriggerAttack failed', e);
+        }
+        return false;
+      }
+    };
+
+    // Attempt now
+    doTrigger();
+  };
+
+  const safeTriggerRelease = (inst, note) => {
+    if (!inst) return;
+    try {
+      if (!note) {
+        // If no note provided, try generic release if available
+        if (typeof inst.releaseAll === 'function') inst.releaseAll();
+        return;
+      }
+
+      if (typeof inst.triggerRelease === 'function') {
+        inst.triggerRelease(note);
+      } else if (typeof inst.triggerAttackRelease === 'function') {
+        // can't release a triggerAttackRelease (it manages its own release)
+        // so do nothing here
+      } else if (typeof inst.untrigger === 'function') {
+        inst.untrigger(note);
+      } else if (typeof inst.releaseAll === 'function') {
+        inst.releaseAll();
+      }
+    } catch (e) {
+      console.warn('safeTriggerRelease failed', e);
+    }
+  };
 
   const fragmentShader = `
     #ifdef GL_ES
@@ -160,6 +275,11 @@ export default function Test8() {
 
     return () => {
       if (synthRef.current) {
+        try {
+          if (synthRef.current._effect && typeof synthRef.current._effect.dispose === 'function') {
+            try { synthRef.current._effect.dispose(); } catch (e) {}
+          }
+        } catch (e) {}
         synthRef.current.dispose();
       }
       if (animationFrameRef.current) {
@@ -247,6 +367,81 @@ export default function Test8() {
 
     currentSettingRef.current = setting;
 
+    // Switch the instrument/synth according to the setting's `instrument` field.
+    // Stop any currently-sounding note, dispose the previous synth and
+    // create the right Tone instrument.
+    try {
+      if (currentNoteRef.current && synthRef.current) {
+        try { synthRef.current.triggerRelease(currentNoteRef.current); } catch (e) {}
+        currentNoteRef.current = null;
+      }
+    } catch (e) {}
+    try {
+      if (synthRef.current) {
+        // Before disposing, release any held notes and clear pending timers
+        try {
+          for (const t of releaseTimersRef.current.values()) {
+            try { clearTimeout(t); } catch (e) {}
+          }
+          releaseTimersRef.current.clear();
+        } catch (e) {}
+
+        try {
+          for (const note of activeNotesRef.current.keys()) {
+            try { safeTriggerRelease(synthRef.current, note); } catch (e) {}
+          }
+          activeNotesRef.current.clear();
+        } catch (e) {}
+
+        try { activePointersRef.current.clear(); } catch (e) {}
+        try { currentNoteRef.current = null; } catch (e) {}
+
+        try { synthRef.current.dispose(); } catch (e) {}
+        synthRef.current = null;
+      }
+    } catch (e) {}
+
+    const instr = (setting.instrument || 'piano').toLowerCase();
+    if (instr === 'piano') {
+      synthRef.current = new Tone.Sampler({
+        urls: {
+          C4: 'C4.mp3',
+          'D#4': 'Ds4.mp3',
+          'F#4': 'Fs4.mp3',
+          A4: 'A4.mp3',
+        },
+        release: 1,
+        baseUrl: 'https://tonejs.github.io/audio/salamander/',
+      }).toDestination();
+      try { synthRef.current.volume.value = -8; } catch (e) {}
+      // ensure samples loaded
+      Tone.loaded().then(() => setSamplerLoaded(true));
+    } else if (instr === 'pluck' || instr === 'guitar') {
+      synthRef.current = new Tone.PluckSynth().toDestination();
+      try { synthRef.current.volume.value = -8; } catch (e) {}
+      setSamplerLoaded(true);
+    } else if (instr === 'sine') {
+      synthRef.current = new Tone.Synth({ oscillator: { type: 'sine' } }).toDestination();
+      try { synthRef.current.volume.value = -8; } catch (e) {}
+      setSamplerLoaded(true);
+    } else if (instr === 'pingpong-drum') {
+      try {
+        const pingPong = new Tone.PingPongDelay('4n', 0.2).toDestination();
+        const drum = new Tone.MembraneSynth().connect(pingPong);
+        synthRef.current = drum;
+        synthRef.current._effect = pingPong;
+        setSamplerLoaded(true);
+      } catch (e) {
+        synthRef.current = new Tone.MembraneSynth().toDestination();
+        setSamplerLoaded(true);
+      }
+    } else {
+      // fallback to a simple synth
+      synthRef.current = new Tone.Synth().toDestination();
+      try { synthRef.current.volume.value = -8; } catch (e) {}
+      setSamplerLoaded(true);
+    }
+
     // update mappingRef -> color -> note+octave
     const newMap = {};
     Object.entries(setting.colorToMap || {}).forEach(([color, val]) => {
@@ -295,27 +490,56 @@ export default function Test8() {
   };
 
   const playNote = (r, g, b, x, y) => {
+    // If current setting uses pingpong-drum, play a snare-like noise instead
+    const currentInstr = currentSettingRef.current && (currentSettingRef.current.instrument || '').toLowerCase();
+    if (currentInstr === 'pingpong-drum' && synthRef.current) {
+      try {
+        // short noise hit
+        if (typeof synthRef.current.triggerAttackRelease === 'function') {
+          synthRef.current.triggerAttackRelease('16n');
+        } else if (typeof synthRef.current.triggerAttack === 'function') {
+          synthRef.current.triggerAttack('16n');
+        }
+      } catch (e) {
+        console.warn('pingpong-drum play failed', e);
+      }
+      return;
+    }
+
     const note = getNoteForCell(r, g, b, x, y);
-    if (note && synthRef.current) {
-      // If we're already playing this note, don't retrigger
-      if (currentNoteRef.current === note) {
-        return;
-      }
-      
-      // Stop previous note if any
-      if (currentNoteRef.current) {
-        synthRef.current.triggerRelease(currentNoteRef.current);
-      }
-      
-      // Start new sustained note
-      synthRef.current.triggerAttack(note);
+    // Guard: don't attempt to play sampler notes until samplerLoaded is true.
+    if (!note || !synthRef.current || !isAudioReady) return;
+    if (!samplerLoaded) {
+      // If samples aren't loaded yet, skip triggering now. safeTriggerAttack
+      // already retries on Tone.loaded(), but avoid changing holder state
+      // until the instrument is ready to reduce races.
+      return;
+    }
+
+    // If we're already playing this note, don't retrigger
+    if (currentNoteRef.current === note) return;
+
+    // Use holder-count logic so transitions are smooth and per-pointer logic
+    // remains consistent with mouse dragging behavior.
+    const prev = currentNoteRef.current;
+    try {
+      // increment holder for the new note and play it
+      incNoteCount(note);
+      safeTriggerAttack(synthRef.current, note);
       currentNoteRef.current = note;
+      // decrement the previous note so it will be released with crossfade
+      if (prev && prev !== note) {
+        decNoteCount(prev, false);
+      }
+    } catch (err) {
+      console.warn('playNote error', err);
     }
   };
   
   const stopNote = () => {
-    if (currentNoteRef.current && synthRef.current) {
-      synthRef.current.triggerRelease(currentNoteRef.current);
+    if (currentNoteRef.current) {
+      // Use decNoteCount so the same crossfade scheduling is used
+      decNoteCount(currentNoteRef.current, false);
       currentNoteRef.current = null;
     }
   };
@@ -556,9 +780,16 @@ export default function Test8() {
         // Only trigger if we moved to a different cell
         const cellKey = `${cell.x},${cell.y}`;
         if (lastCellRef.current !== cellKey) {
-          // play sound only if audio unlocked
-          if (isAudioReady) playNote(cell.r, cell.g, cell.b, cell.x, cell.y);
-          lastCellRef.current = cellKey;
+          // determine note for this cell first; if there's no note, don't
+          // change the current sustained note (avoids abrupt silence while dragging)
+          const noteHere = getNoteForCell(cell.r, cell.g, cell.b, cell.x, cell.y);
+          const instr = currentSettingRef.current && (currentSettingRef.current.instrument || '').toLowerCase();
+          // pingpong-drum is a one-shot instrument: still trigger when entering cells
+          const shouldTrigger = (noteHere != null) || (instr === 'pingpong-drum');
+          if (shouldTrigger && isAudioReady) {
+            playNote(cell.r, cell.g, cell.b, cell.x, cell.y);
+            lastCellRef.current = cellKey;
+          }
 
           // increment start counter (cap at 5)
           setStartCounter((c) => {
@@ -633,6 +864,88 @@ export default function Test8() {
     }
   };
 
+  // play a cell for a specific pointerId (supports multi-touch)
+  const playCellForPointer = (cell, pointerId, clientX, clientY) => {
+    if (!cell) return;
+    const cellKey = `${cell.x},${cell.y}`;
+    const state = activePointersRef.current.get(pointerId) || {};
+    if (state.lastCellKey === cellKey) return;
+
+    const instr = currentSettingRef.current && (currentSettingRef.current.instrument || '').toLowerCase();
+    const note = getNoteForCell(cell.r, cell.g, cell.b, cell.x, cell.y);
+    // If there's no musical note here and instrument isn't a one-shot, do
+    // not update pointer's lastCellKey nor stop the previously held note.
+    if (note == null && instr !== 'pingpong-drum') return;
+
+    // update last cell
+    state.lastCellKey = cellKey;
+
+    // handle ambient/start counter like mouse
+    setStartCounter((c) => {
+      const next = Math.min(10, c + 1);
+      if (next === 3 && !ambientTriggered && !ambientAudioRef.current) {
+        try {
+          const setting = currentSettingRef.current || {};
+          if (setting.ambient) {
+            const a = new Audio(setting.ambient);
+            a.loop = true;
+            a.volume = 0.5;
+            a.play().catch(() => {});
+            ambientAudioRef.current = a;
+            setAmbientTriggered(true);
+          }
+        } catch (err) {}
+      }
+      return next;
+    });
+
+    // visual selection and ripple
+    selectedCellRef.current = cell;
+    try {
+      const dom = getDominantColor(cell.r, cell.g, cell.b);
+      if (dom === 'red') setSwatchColor('red');
+      else if (dom === 'green') setSwatchColor('lime');
+      else if (dom === 'blue') setSwatchColor('blue');
+      else setSwatchColor('transparent');
+    } catch (e) {}
+    drawGrid();
+    try { rippleRef.current?.addRipple(clientX, clientY); } catch (e) {}
+
+    // trigger the sound for this pointer
+    if (instr === 'pingpong-drum' && synthRef.current) {
+      try {
+        if (typeof synthRef.current.triggerAttackRelease === 'function') {
+          synthRef.current.triggerAttackRelease('16n');
+        } else if (typeof synthRef.current.triggerAttack === 'function') {
+          synthRef.current.triggerAttack('16n');
+        }
+      } catch (e) { console.warn('pingpong-drum play failed', e); }
+      activePointersRef.current.set(pointerId, state);
+      return;
+    }
+
+    // Guard: if samples/instrument aren't ready, skip triggering
+    if (note && !samplerLoaded) return;
+
+    if (note && synthRef.current && isAudioReady) {
+      try {
+        // release previous note held by this pointer (if any)
+        if (state.note && state.note !== note) {
+          decNoteCount(state.note, false);
+        }
+        // increment holder count for this note
+        incNoteCount(note);
+        safeTriggerAttack(synthRef.current, note);
+        // store the note so we can release it when this pointer lifts
+        state.note = note;
+      } catch (err) {
+        console.warn('play error', err);
+      }
+    }
+
+    activePointersRef.current.set(pointerId, state);
+  };
+
   const handleMouseDown = (e) => {
     if (!imageLoaded) return;
     mouseDownRef.current = true;
@@ -644,6 +957,100 @@ export default function Test8() {
     lastCellRef.current = null;
     if (isAudioReady) stopNote();
   };
+
+  // Pointer (touch) support: mirror mouse handlers so dragging a finger on
+  // the canvas behaves like mouse drag on desktop.
+  const handlePointerEvent = (e) => {
+    // For pointer events, treat them like mouse events; use clientX/Y
+    // We support multi-touch by tracking pointerId in activePointersRef.
+    if (!imageLoaded) return;
+    if (!activePointersRef.current.has(e.pointerId)) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+
+    for (let cell of dataRef.current) {
+      if (px >= cell.x && px < cell.x + gridDensity && py >= cell.y && py < cell.y + gridDensity) {
+        playCellForPointer(cell, e.pointerId, e.clientX, e.clientY);
+        break;
+      }
+    }
+  };
+
+  const handlePointerDown = (e) => {
+    // prevent page scroll / gestures while interacting with the canvas
+    try { e.preventDefault(); } catch (err) {}
+    if (!imageLoaded) return;
+    // register this active pointer
+    activePointersRef.current.set(e.pointerId, { lastCellKey: null, note: null });
+    // attempt to capture the pointer so we continue receiving events
+    try {
+      const tgt = e.currentTarget || e.target || canvasRef.current;
+      if (tgt && typeof tgt.setPointerCapture === 'function') {
+        try { tgt.setPointerCapture(e.pointerId); } catch (err) {}
+      }
+    } catch (err) {}
+
+    handlePointerEvent(e);
+  };
+
+  const handlePointerUp = (e) => {
+    // release any note associated with this pointer
+    try {
+      const state = activePointersRef.current.get(e.pointerId);
+      if (state && state.note && synthRef.current) {
+        // decrement holder count and schedule release with crossfade
+        decNoteCount(state.note, false);
+      }
+    } catch (err) {}
+    activePointersRef.current.delete(e.pointerId);
+    try {
+      const tgt = e.currentTarget || e.target || canvasRef.current;
+      if (tgt && typeof tgt.releasePointerCapture === 'function') {
+        try { tgt.releasePointerCapture(e.pointerId); } catch (err) {}
+      }
+    } catch (err) {}
+    // if no pointers active, reset global mouse-like state
+    if (activePointersRef.current.size === 0) {
+      lastCellRef.current = null;
+      mouseDownRef.current = false;
+    }
+  };
+
+  const handlePointerCancel = (e) => {
+    // treat cancel like an up to ensure notes are released
+    try { handlePointerUp(e); } catch (err) {}
+  };
+
+  const handleLostPointerCapture = (e) => {
+    // fallback for lost capture: ensure we release any note for this pointer
+    try { handlePointerUp(e); } catch (err) {}
+  };
+
+  // Clear pending release timers and any held notes on unmount to avoid
+  // dangling timers or sounds after component is removed.
+  useEffect(() => {
+    return () => {
+      try {
+        for (const t of releaseTimersRef.current.values()) {
+          try { clearTimeout(t); } catch (e) {}
+        }
+        releaseTimersRef.current.clear();
+
+        for (const note of activeNotesRef.current.keys()) {
+          try { safeTriggerRelease(synthRef.current, note); } catch (e) {}
+        }
+        activeNotesRef.current.clear();
+
+        activePointersRef.current.clear();
+        lastCellRef.current = null;
+        mouseDownRef.current = false;
+      } catch (e) {}
+    };
+  }, []);
 
   return (
     <div style = { { display: 'flex', flexDirection: '', alignItems: 'center', justifyContent: 'center', backgroundColor: 'black', padding: '16px',
@@ -712,6 +1119,12 @@ export default function Test8() {
           onMouseUp={handleMouseUp}
           onMouseMove={handleMouseEvent}
           onMouseLeave={handleMouseUp}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerEvent}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          onLostPointerCapture={handleLostPointerCapture}
+          style={{ touchAction: 'none' }}
         />
         
         <canvas

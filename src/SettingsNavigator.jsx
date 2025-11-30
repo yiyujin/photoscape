@@ -10,6 +10,7 @@ const data = [
   {
     img: "/img0.jpg",
     ambient: "/img0.mp3",
+    instrument: 'piano',
     colorToMap: {
       red: { note: "Bb", octave: "3", brightness: 0.2 },
       green: { note: "D", octave: "4", brightness: 0.5 },
@@ -28,6 +29,7 @@ const data = [
   {
     img: "/img2.jpg",
     ambient: "/img2.mp3",
+    instrument: 'sine',
     colorToMap: {
       red: { note: "G", octave: "3", brightness: 0.3 },
       green: { note: "Bb", octave: "3", brightness: 0.45 },
@@ -37,6 +39,7 @@ const data = [
   {
     img: "/img3.jpg",
     ambient: "/img3.mp3",
+    instrument: 'metal',
     colorToMap: {
       red: { note: "G", octave: "3", brightness: 0.6 },
       green: { note: "Bb", octave: "3", brightness: 0.25 },
