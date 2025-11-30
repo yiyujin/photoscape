@@ -1030,6 +1030,79 @@ export default function Test8() {
     try { handlePointerUp(e); } catch (err) {}
   };
 
+  // Touch event fallbacks for platforms that don't fully support PointerEvents
+  const handleTouchStart = (e) => {
+    try { e.preventDefault(); } catch (err) {}
+    if (!imageLoaded) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      const id = t.identifier;
+      // register pointer-like state
+      activePointersRef.current.set(id, { lastCellKey: null, note: null });
+      const px = t.clientX - rect.left;
+      const py = t.clientY - rect.top;
+
+      for (let cell of dataRef.current) {
+        if (px >= cell.x && px < cell.x + gridDensity && py >= cell.y && py < cell.y + gridDensity) {
+          playCellForPointer(cell, id, t.clientX, t.clientY);
+          break;
+        }
+      }
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    try { e.preventDefault(); } catch (err) {}
+    if (!imageLoaded) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      const id = t.identifier;
+      const px = t.clientX - rect.left;
+      const py = t.clientY - rect.top;
+
+      for (let cell of dataRef.current) {
+        if (px >= cell.x && px < cell.x + gridDensity && py >= cell.y && py < cell.y + gridDensity) {
+          playCellForPointer(cell, id, t.clientX, t.clientY);
+          break;
+        }
+      }
+    }
+  };
+
+  const handleTouchEnd = (e) => {
+    try { e.preventDefault(); } catch (err) {}
+    if (!imageLoaded) return;
+
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      const id = t.identifier;
+      try {
+        const state = activePointersRef.current.get(id);
+        if (state && state.note && synthRef.current) {
+          decNoteCount(state.note, false);
+        }
+      } catch (err) {}
+      activePointersRef.current.delete(id);
+    }
+
+    if (activePointersRef.current.size === 0) {
+      lastCellRef.current = null;
+      mouseDownRef.current = false;
+    }
+  };
+
+  const handleTouchCancel = (e) => {
+    try { handleTouchEnd(e); } catch (err) {}
+  };
+
   // Clear pending release timers and any held notes on unmount to avoid
   // dangling timers or sounds after component is removed.
   useEffect(() => {
@@ -1082,7 +1155,7 @@ export default function Test8() {
                 width : "960px", height : "640px",
                 display: startCounter >= 5 ? 'block' : 'none',
                 color : "transparent",
-                // background : "transparent",
+                background : "transparent",
               }}
             />
           )}
@@ -1124,7 +1197,19 @@ export default function Test8() {
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerCancel}
           onLostPointerCapture={handleLostPointerCapture}
-          style={{ touchAction: 'none' }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchCancel}
+          draggable={false}
+          onContextMenu={(e) => { try { e.preventDefault(); } catch (err) {} }}
+          style={{
+            touchAction: 'none',
+            WebkitTouchCallout: 'none',
+            WebkitUserSelect: 'none',
+            userSelect: 'none',
+            WebkitUserDrag: 'none'
+          }}
         />
         
         <canvas
