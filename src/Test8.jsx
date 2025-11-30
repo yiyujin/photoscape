@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as Tone from 'tone';
 import SettingsNavigator from './SettingsNavigator';
 import RippleMany from './RippleMany';
+import { Link } from 'react-router-dom';
 
 export default function Test8() {
   const canvasRef = useRef(null);
@@ -76,6 +77,7 @@ export default function Test8() {
 
   const settingsNavRef = useRef(null);
   const [swatchColor, setSwatchColor] = useState('transparent');
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
     const onNextPressed = () => {
@@ -366,6 +368,8 @@ export default function Test8() {
     if (!setting) return;
 
     currentSettingRef.current = setting;
+    // track the current settings index so UI (Next button) can adapt
+    try { setCurrentIndex(typeof index === 'number' ? index : 0); } catch (e) {}
 
     // Switch the instrument/synth according to the setting's `instrument` field.
     // Stop any currently-sounding note, dispose the previous synth and
@@ -1128,6 +1132,7 @@ export default function Test8() {
   return (
     <div style = { { display: 'flex', flexDirection: '', alignItems: 'center', justifyContent: 'center', backgroundColor: 'black', padding: '16px',
       // background : "rgba(255, 255, 255, 0.1)"
+      // background : "red",
      }}>
       <SettingsNavigator ref={settingsNavRef} onChange={handleSettingChange} ambientPlaying = { ambientTriggered } />
 
@@ -1171,15 +1176,29 @@ export default function Test8() {
           )}
 
           {/* NEXT SCENE BUTTON */}
-          <button onClick = { () => { setStartCounter(0); setIsAudioReady(false); settingsNavRef.current?.next?.();}}
-            style = { {
-              width : "100px", height : "100px", // bottom right corner
-              marginLeft : "760px",
-              top : 0,
-              background : "transparent",
-              // background : "red",
-            } }  
-          />
+          {currentIndex < 3 ? (
+            <button onClick={() => { setStartCounter(0); setIsAudioReady(false); settingsNavRef.current?.next?.(); }}
+              style={{
+                width: "100px", height: "100px",
+                marginLeft: "760px",
+                top: 0,
+                // background: "red",
+                background : "transparent"
+              }}
+            />
+          ) : (
+            <Link to="/ending" style={{ textDecoration: 'none' }}>
+              <button onClick={() => { setStartCounter(0); setIsAudioReady(false); }}
+                style={{
+                  width: "100px", height: "100px",
+                  marginLeft: "760px",
+                  top: 0,
+                  // background: "red",
+                  background : "transparent"
+                }}
+              />
+            </Link>
+          )}
         </div>
 
 
