@@ -100,8 +100,12 @@ export default function Test8() {
 
   const currentSettingRef = useRef(null);
 
-  const width = 960;
-  const height = 640;
+  // const width = 960;
+  // const height = 640;
+    const width = 1179 * 0.5;
+  const height = 2556 * 0.5;
+
+  // 1179 × 2556
   const gridDensity = 20;
 
   const mappingRef = useRef({
@@ -1140,15 +1144,15 @@ export default function Test8() {
         // border : "1px solid red",
       } }>
 
-        {/* SIDE DIV */}
-        { isAudioReady && (
+        {/* GRADIENT SIDE DIV */}
+        {/* { isAudioReady && (
           <div style={{ position: 'absolute', left: "-95px", top: 0, width: '100px', height: '200%', zIndex: 999,
               background: swatchColor || 'transparent', transition: 'background 160ms ease',
               filter : "blur(40px)",
               animation: "oscillateOpacity 2s ease-in-out infinite"
             }}
           />
-        )}
+        )} */}
         
         {/* BUTTONS HERE */}
         <div style = { { position : "absolute", zIndex : 99, background : "", display : "flex" } }>
@@ -1157,7 +1161,7 @@ export default function Test8() {
               onClick={startAudio}
               style={{
                 // color: 'white', cursor: 'pointer',
-                width : "960px", height : "640px",
+                width : `${width}px`, height : `${height}px`,
                 display: startCounter >= 5 ? 'block' : 'none',
                 color : "transparent",
                 background : "transparent",

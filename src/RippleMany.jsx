@@ -20,8 +20,10 @@ function RippleOne(props, ref, ambientTriggered, startCounter) {
     distSample: 0,
   });
 
-  const width = 960;
-  const height = 640;
+  // const width = 960;
+  // const height = 640;
+      const width = 1179 * 0.5;
+  const height = 2556 * 0.5;
 
   const vertexShader = `#version 300 es
     in vec2 aPos;
@@ -53,6 +55,7 @@ uniform float u_maxRippleTime;
 
 void main() {
   vec2 uv = vUV;
+  float aspect = u_resolution.x / u_resolution.y;
 
   // Sum contributions from multiple ripples
   float totalRipple = 0.0;
@@ -62,6 +65,8 @@ void main() {
     vec2 rPos = u_ripplePos[i];
     float rStart = u_rippleStart[i];
     vec2 v = uv - rPos;
+    // aspect-correct X so distance is measured in screen space (pixels)
+    v.x *= aspect;
     float amt = 2.0;
     float dist = length(v) * amt + 0.0001;
     float t = u_time - rStart;
@@ -88,7 +93,10 @@ void main() {
     // DRAW IMAGE with ripple displacement
     float amplitude = 0.03;
     float tr = totalRipple * amplitude;
-    vec2 offset = tr * normalize(totalOffset + vec2(0.001));
+    // totalOffset was accumulated in aspect-corrected space; convert back to UV space
+    vec2 correctedOffset = totalOffset;
+    correctedOffset.x /= aspect;
+    vec2 offset = tr * normalize(correctedOffset + vec2(0.001));
     vec3 color = texture(u_texture, clamp(uv - offset, 0.0, 1.0)).rgb;
     fragColor = vec4(color, 1.0);
   }
