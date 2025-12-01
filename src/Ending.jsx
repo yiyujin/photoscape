@@ -29,6 +29,8 @@ export default function Ending() {
 
     const gapRow = 20; // 20
     const gapCol = 20; // 64 
+    const bgRef = useRef(null);
+    const [bgPlaying, setBgPlaying] = useState(false);
 
     return(
         <div style={{
@@ -61,7 +63,7 @@ export default function Ending() {
                         </button>
                     </div>
                 )}
-                { Array.from({ length: 12 }).map((_, i) => (
+                { Array.from({ length: 9 }).map((_, i) => (
                     <PlayButton
                         key={i}
                         index={i}
@@ -73,7 +75,36 @@ export default function Ending() {
                 ))}
             </ButtonGrid>
             
-            <ChordLooper />
+            {/* MP3 BUTTON */}
+            <div style={{ position: 'absolute', right: 16, bottom: 16, zIndex: 1000 }}>
+                <button
+                    onPointerDown={async (e) => {
+                        try { if (e && e.preventDefault) e.preventDefault(); } catch (err) {}
+                        try {
+                            if (!bgRef.current) {
+                                bgRef.current = new Audio('/bg.mp3');
+                                bgRef.current.loop = false;
+                                bgRef.current.preload = 'auto';
+                                bgRef.current.addEventListener('ended', () => setBgPlaying(false));
+                            }
+                            // restart if already played
+                            bgRef.current.currentTime = 0;
+                            await bgRef.current.play();
+                            setBgPlaying(true);
+                        } catch (err) {
+                            console.warn('bg play failed', err);
+                        }
+                    }}
+                    style={{
+                        width : "200px",
+                        height : "200px",
+                        background : "transparent"
+                     }}
+                    disabled={bgPlaying}
+                >
+                    {/* {bgPlaying ? 'Playing…' : 'Play bg.mp3'} */}
+                </button>
+            </div>
         </div>
     );
 }

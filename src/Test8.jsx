@@ -1381,7 +1381,7 @@ export default function Test8() {
           )}
 
           {/* NEXT SCENE BUTTON */}
-          {currentIndex < 3 ? (
+          {currentIndex < 2 ? (
             <button onClick={() => { setStartCounter(0); setIsAudioReady(false); settingsNavRef.current?.next?.(); }}
               style={{
                 width: "100px", height: "100px",

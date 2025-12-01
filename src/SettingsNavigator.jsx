@@ -14,7 +14,7 @@ const data = [
     colorToMap: {
       red: { note: "Bb", octave: "3", brightness: 0.2 },
       green: { note: "D", octave: "4", brightness: 0.5 },
-      blue: { note: "F", octave: "4", brightness: 0.8 }, // A C
+      blue: { note: "C", octave: "5", brightness: 0.8 }, // F4
     },
   },
   {
@@ -32,21 +32,22 @@ const data = [
     ambient: "/img2.mp3",
     instrument: 'piano',
     colorToMap: {
-      red: { note: "G", octave: "3", brightness: 0.3 },
-      green: { note: "Bb", octave: "3", brightness: 0.45 },
-      blue: { note: "D", octave: "4", brightness: 0.7 },
+      red: { note: "G", octave: "3", brightness: 0.3 }, // G3
+      green: { note: "Bb", octave: "4", brightness: 0.45 }, // Bb3
+      blue: { note: "Eb", octave: "4", brightness: 0.7 }, // D4
     },
   },
-  {
-    img: "/img3.jpg",
-    ambient: "/img3.mp3",
-    instrument: 'piano',
-    colorToMap: {
-      red: { note: "C", octave: "5", brightness: 0.6 }, // G 3
-      green: { note: "Bb", octave: "4", brightness: 0.25 }, // Bb 3
-      blue: { note: "Eb", octave: "4", brightness: 0.9 },
-    },
-  },
+
+  // {
+  //   img: "/img3.jpg",
+  //   ambient: "/img3.mp3",
+  //   instrument: 'piano',
+  //   colorToMap: {
+  //     red: { note: "C", octave: "5", brightness: 0.6 }, // G 3
+  //     green: { note: "Bb", octave: "4", brightness: 0.25 }, // Bb 3
+  //     blue: { note: "Eb", octave: "4", brightness: 0.9 },
+  //   },
+  // },
 ];
 
 export const settingsData = data;
