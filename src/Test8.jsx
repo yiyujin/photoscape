@@ -100,13 +100,10 @@ export default function Test8() {
 
   const currentSettingRef = useRef(null);
 
-  // const width = 960;
-  // const height = 640;
-    const width = 1179 * 0.5;
-  const height = 2556 * 0.5;
+  const width = 960;
+  const height = 640;
 
-  // 1179 × 2556
-  const gridDensity = 20;
+  const gridDensity = 40;
 
   const mappingRef = useRef({
     red: { note: 'G', baseOctave: 3 },
@@ -788,6 +785,9 @@ export default function Test8() {
         // Only trigger if we moved to a different cell
         const cellKey = `${cell.x},${cell.y}`;
         if (lastCellRef.current !== cellKey) {
+          // ALWAYS update lastCellRef first, even for silent cells
+          lastCellRef.current = cellKey;
+          
           // determine note for this cell first; if there's no note, don't
           // change the current sustained note (avoids abrupt silence while dragging)
           const noteHere = getNoteForCell(cell.r, cell.g, cell.b, cell.x, cell.y);
@@ -796,14 +796,13 @@ export default function Test8() {
           const shouldTrigger = (noteHere != null) || (instr === 'pingpong-drum');
           if (shouldTrigger && isAudioReady) {
             playNote(cell.r, cell.g, cell.b, cell.x, cell.y);
-            lastCellRef.current = cellKey;
           }
 
-          // increment start counter (cap at 5)
+          // increment start counter (cap at 10)
           setStartCounter((c) => {
             const next = Math.min(10, c + 1);
 
-            // If this user gesture moves the counter to 2, start ambient audio
+            // If this user gesture moves the counter to 3, start ambient audio
             // directly here so the play() call originates from a user gesture
             // (avoids browser autoplay blocking) and only start once.
             if (next === 3 && !ambientTriggered && !ambientAudioRef.current) {

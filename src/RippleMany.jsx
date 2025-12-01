@@ -20,10 +20,8 @@ function RippleOne(props, ref, ambientTriggered, startCounter) {
     distSample: 0,
   });
 
-  // const width = 960;
-  // const height = 640;
-      const width = 1179 * 0.5;
-  const height = 2556 * 0.5;
+  const width = 960;
+  const height = 640;
 
   const vertexShader = `#version 300 es
     in vec2 aPos;
