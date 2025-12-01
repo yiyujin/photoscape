@@ -42,8 +42,8 @@ const data = [
     ambient: "/img3.mp3",
     instrument: 'piano',
     colorToMap: {
-      red: { note: "G", octave: "3", brightness: 0.6 },
-      green: { note: "Bb", octave: "3", brightness: 0.25 },
+      red: { note: "C", octave: "5", brightness: 0.6 }, // G 3
+      green: { note: "Bb", octave: "4", brightness: 0.25 }, // Bb 3
       blue: { note: "Eb", octave: "4", brightness: 0.9 },
     },
   },
