@@ -35,6 +35,41 @@ export default function Test8() {
   const activeNotesRef = useRef(new Map()); // note -> count of holders
   const releaseTimersRef = useRef(new Map()); // note -> timer id
   const CROSSFADE_MS = 120;
+  // helper to spawn a short morph voice to smooth transitions between notes
+  const spawnMorphVoice = (note) => {
+    if (!note) return;
+    try {
+      const instr = currentSettingRef.current && (currentSettingRef.current.instrument || '').toLowerCase();
+      let v;
+      if (instr === 'pluck' || instr === 'guitar') {
+        v = new Tone.PluckSynth().toDestination();
+      } else if (instr === 'pingpong-drum') {
+        v = new Tone.MembraneSynth().toDestination();
+      } else if (instr === 'sine') {
+        v = new Tone.Synth({ oscillator: { type: 'sine' } }).toDestination();
+      } else {
+        v = new Tone.Synth({ oscillator: { type: 'triangle' } }).toDestination();
+      }
+      try { v.volume.value = -18; } catch (e) {}
+      const durMs = CROSSFADE_MS * 2;
+      const dur = `${(durMs/1000).toFixed(3)}s`;
+      if (typeof v.triggerAttackRelease === 'function') {
+        v.triggerAttackRelease(note, dur);
+        setTimeout(() => { try { v.dispose(); } catch (e) {} }, durMs + 400);
+      } else if (typeof v.triggerAttack === 'function') {
+        v.triggerAttack(note);
+        setTimeout(() => {
+          try { if (typeof v.triggerRelease === 'function') v.triggerRelease(note); } catch (e) {}
+          try { v.dispose(); } catch (e) {}
+        }, durMs);
+      }
+    } catch (e) {
+      // ignore spawn failures
+    }
+  };
+  const prevDominantRef = useRef(null);
+  const pendingSwitchTimerRef = useRef(null);
+  const pendingSwitchCellKeyRef = useRef(null);
 
   const incNoteCount = (note) => {
     if (!note) return;
@@ -110,6 +145,38 @@ export default function Test8() {
     green: { note: 'Bb', baseOctave: 3 },
     blue: { note: 'Eb', baseOctave: 4 },
   });
+
+  // NOTE HELPERS: map note names to chromatic indices and back
+  const CHROMATIC = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const flatsToSharps = { 'Bb': 'A#', 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#' };
+  const normalizeNoteName = (n) => {
+    if (!n) return n;
+    n = String(n).trim();
+    if (flatsToSharps[n]) return flatsToSharps[n];
+    return n;
+  };
+  const noteNameToIndex = (name) => {
+    if (!name) return 0;
+    const nn = normalizeNoteName(name.replace(/[0-9]/g, ''));
+    const idx = CHROMATIC.indexOf(nn);
+    return idx >= 0 ? idx : 0;
+  };
+  const indexToNoteName = (idx) => {
+    return CHROMATIC[(idx % 12 + 12) % 12];
+  };
+
+  // deterministic pseudo-random [0,1) based on integer coordinates
+  const cellNoise = (x, y) => {
+    // Use a sin/hash combo for stable randomness per cell
+    const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+    return v - Math.floor(v);
+  };
+
+  // Build a simple pentatonic scale (major) around a root
+  const buildPentatonicMajor = (rootIndex) => {
+    const intervals = [0, 2, 4, 7, 9];
+    return intervals.map(iv => (rootIndex + iv) % 12);
+  };
 
   // Helpers to safely play/release notes on different Tone instruments.
   const safeTriggerAttack = (inst, note) => {
@@ -486,12 +553,39 @@ export default function Test8() {
     const mapped = map[dominantColor];
     if (!mapped) return null;
 
-    // compute brightness-based octave mapping
+    // brightness 0..1
     const brightness = ((r + g + b) / 3) / 255.0;
+
+    // base octave
     const base = (mapped.baseOctave && Number.isFinite(mapped.baseOctave)) ? mapped.baseOctave : (parseInt(mapped.octave || '3', 10) || 3);
-    const step = Math.min(2, Math.max(0, Math.floor(brightness * 3)));
-    const octave = base - 1 + step; // maps to base-1, base, base+1
-    return `${mapped.note}${octave}`;
+
+    // build a pentatonic scale around the mapped root
+    const rootIdx = noteNameToIndex(mapped.note);
+    const scale = buildPentatonicMajor(rootIdx); // array of chromatic indices
+
+    // deterministic noise per cell to vary notes but stay coherent spatially
+    const n = cellNoise(x, y);
+
+    // choose scale degree biased by brightness (darker => lower degrees)
+    const degreeFloat = brightness * (scale.length - 1);
+    // combine degree and noise for continuous variation
+    let degreeIndex = Math.floor(Math.max(0, Math.min(scale.length - 1, degreeFloat + (n - 0.5) * 1.2)));
+
+    // compute octave offset: push brighter cells up an octave occasionally
+    let octaveOffset = Math.floor(brightness * 2); // 0..1
+
+    // compute chromatic index and normalize octave
+    let chroma = scale[degreeIndex];
+    let octave = base + octaveOffset;
+    // If chroma wraps past root (not needed for pentatonic here), adjust octave accordingly
+    // (no-op for current intervals, but kept for correctness)
+    while (chroma >= 12) {
+      chroma -= 12;
+      octave += 1;
+    }
+
+    const noteName = indexToNoteName(chroma);
+    return `${noteName}${octave}`;
   };
 
   const playNote = (r, g, b, x, y) => {
@@ -530,6 +624,10 @@ export default function Test8() {
     try {
       // increment holder for the new note and play it
       incNoteCount(note);
+      // spawn a short morph voice so the new pitch overlaps smoothly
+      if (prev && prev !== note) {
+        spawnMorphVoice(note);
+      }
       safeTriggerAttack(synthRef.current, note);
       currentNoteRef.current = note;
       // decrement the previous note so it will be released with crossfade
@@ -594,7 +692,8 @@ export default function Test8() {
         const thumbH = 100;
         const padding = 20;
         const dx = Math.max(0, width - thumbW - padding);
-        const dy = Math.floor((height - thumbH) / 2);
+        // const dy = Math.floor((height - thumbH) / 2);
+        const dy = 20;
 
         // Draw background box
         ctx.save();
@@ -785,17 +884,46 @@ export default function Test8() {
         // Only trigger if we moved to a different cell
         const cellKey = `${cell.x},${cell.y}`;
         if (lastCellRef.current !== cellKey) {
-          // ALWAYS update lastCellRef first, even for silent cells
-          lastCellRef.current = cellKey;
-          
           // determine note for this cell first; if there's no note, don't
           // change the current sustained note (avoids abrupt silence while dragging)
           const noteHere = getNoteForCell(cell.r, cell.g, cell.b, cell.x, cell.y);
+          const dom = getDominantColor(cell.r, cell.g, cell.b);
           const instr = currentSettingRef.current && (currentSettingRef.current.instrument || '').toLowerCase();
           // pingpong-drum is a one-shot instrument: still trigger when entering cells
           const shouldTrigger = (noteHere != null) || (instr === 'pingpong-drum');
+
+          // If the dominant color changed from the previous cell, debounce the switch
           if (shouldTrigger && isAudioReady) {
-            playNote(cell.r, cell.g, cell.b, cell.x, cell.y);
+            const prevDom = prevDominantRef.current;
+            if (prevDom && prevDom !== dom && currentNoteRef.current) {
+              // start or reset a short timer; only switch if user stays on this cell
+              if (pendingSwitchTimerRef.current) {
+                clearTimeout(pendingSwitchTimerRef.current);
+              }
+              pendingSwitchCellKeyRef.current = cellKey;
+              pendingSwitchTimerRef.current = setTimeout(() => {
+                // ensure pointer still on same cell
+                if (pendingSwitchCellKeyRef.current === cellKey) {
+                  // spawn a morph voice to smooth the transition
+                  try { spawnMorphVoice(getNoteForCell(cell.r, cell.g, cell.b, cell.x, cell.y)); } catch (e) {}
+                  playNote(cell.r, cell.g, cell.b, cell.x, cell.y);
+                  lastCellRef.current = cellKey;
+                  prevDominantRef.current = dom;
+                }
+                pendingSwitchTimerRef.current = null;
+                pendingSwitchCellKeyRef.current = null;
+              }, 120);
+            } else {
+              // immediate trigger: cancel any pending switch
+              if (pendingSwitchTimerRef.current) {
+                clearTimeout(pendingSwitchTimerRef.current);
+                pendingSwitchTimerRef.current = null;
+                pendingSwitchCellKeyRef.current = null;
+              }
+              playNote(cell.r, cell.g, cell.b, cell.x, cell.y);
+              lastCellRef.current = cellKey;
+              prevDominantRef.current = dom;
+            }
           }
 
           // increment start counter (cap at 10)
@@ -884,6 +1012,48 @@ export default function Test8() {
     // not update pointer's lastCellKey nor stop the previously held note.
     if (note == null && instr !== 'pingpong-drum') return;
 
+    const dom = getDominantColor(cell.r, cell.g, cell.b);
+
+    // Debounce color-change switches per-pointer
+    const prevDom = state.prevDominant || null;
+    if (note && isAudioReady) {
+      if (prevDom && prevDom !== dom && state.note) {
+        // schedule a short switch
+        if (state.pendingSwitchTimer) {
+          clearTimeout(state.pendingSwitchTimer);
+        }
+        state.pendingSwitchCellKey = cellKey;
+        state.pendingSwitchTimer = setTimeout(() => {
+          if (state.pendingSwitchCellKey === cellKey) {
+            try {
+              // spawn a morph voice for smooth transition
+              try { spawnMorphVoice(note); } catch (e) {}
+              // release previous note for this pointer if different
+              if (state.note && state.note !== note) {
+                decNoteCount(state.note, false);
+              }
+              incNoteCount(note);
+              safeTriggerAttack(synthRef.current, note);
+              state.note = note;
+            } catch (err) { console.warn('play error', err); }
+            state.lastCellKey = cellKey;
+            state.prevDominant = dom;
+          }
+          state.pendingSwitchTimer = null;
+          state.pendingSwitchCellKey = null;
+        }, 120);
+        activePointersRef.current.set(pointerId, state);
+        return;
+      } else {
+        // immediate trigger: cancel pending
+        if (state.pendingSwitchTimer) {
+          clearTimeout(state.pendingSwitchTimer);
+          state.pendingSwitchTimer = null;
+          state.pendingSwitchCellKey = null;
+        }
+      }
+    }
+
     // update last cell
     state.lastCellKey = cellKey;
 
@@ -945,6 +1115,7 @@ export default function Test8() {
         safeTriggerAttack(synthRef.current, note);
         // store the note so we can release it when this pointer lifts
         state.note = note;
+        state.prevDominant = dom;
       } catch (err) {
         console.warn('play error', err);
       }
@@ -962,6 +1133,11 @@ export default function Test8() {
   const handleMouseUp = () => {
     mouseDownRef.current = false;
     lastCellRef.current = null;
+    if (pendingSwitchTimerRef.current) {
+      try { clearTimeout(pendingSwitchTimerRef.current); } catch (e) {}
+      pendingSwitchTimerRef.current = null;
+      pendingSwitchCellKeyRef.current = null;
+    }
     if (isAudioReady) stopNote();
   };
 
@@ -1008,6 +1184,11 @@ export default function Test8() {
     // release any note associated with this pointer
     try {
       const state = activePointersRef.current.get(e.pointerId);
+      if (state && state.pendingSwitchTimer) {
+        try { clearTimeout(state.pendingSwitchTimer); } catch (err) {}
+        state.pendingSwitchTimer = null;
+        state.pendingSwitchCellKey = null;
+      }
       if (state && state.note && synthRef.current) {
         // decrement holder count and schedule release with crossfade
         decNoteCount(state.note, false);
@@ -1093,6 +1274,11 @@ export default function Test8() {
       const id = t.identifier;
       try {
         const state = activePointersRef.current.get(id);
+        if (state && state.pendingSwitchTimer) {
+          try { clearTimeout(state.pendingSwitchTimer); } catch (err) {}
+          state.pendingSwitchTimer = null;
+          state.pendingSwitchCellKey = null;
+        }
         if (state && state.note && synthRef.current) {
           decNoteCount(state.note, false);
         }
@@ -1125,6 +1311,14 @@ export default function Test8() {
         }
         activeNotesRef.current.clear();
 
+        // clear per-pointer pending timers if any
+        try {
+          for (const [id, st] of activePointersRef.current.entries()) {
+            if (st && st.pendingSwitchTimer) {
+              try { clearTimeout(st.pendingSwitchTimer); } catch (e) {}
+            }
+          }
+        } catch (e) {}
         activePointersRef.current.clear();
         lastCellRef.current = null;
         mouseDownRef.current = false;
@@ -1144,14 +1338,22 @@ export default function Test8() {
       } }>
 
         {/* GRADIENT SIDE DIV */}
-        {/* { isAudioReady && (
-          <div style={{ position: 'absolute', left: "-95px", top: 0, width: '100px', height: '200%', zIndex: 999,
+        { isAudioReady && (
+          // <div style={{ position: 'absolute', left: "-95px", top: 0, width: '100px', height: '200%', zIndex: 999,
+          //     background: swatchColor || 'transparent', transition: 'background 160ms ease',
+          //     filter : "blur(40px)",
+          //     animation: "oscillateOpacity 2s ease-in-out infinite"
+          //   }}
+          // />
+
+          <div style={{ position: 'absolute', left: 0, top: 0, width: width, height: height, zIndex: 999,
               background: swatchColor || 'transparent', transition: 'background 160ms ease',
-              filter : "blur(40px)",
-              animation: "oscillateOpacity 2s ease-in-out infinite"
+              // filter : "blur(40px)",
+              animation: "oscillateOpacity 4s ease-in-out infinite",
+              pointerEvents : "none",
             }}
           />
-        )} */}
+        )}
         
         {/* BUTTONS HERE */}
         <div style = { { position : "absolute", zIndex : 99, background : "", display : "flex" } }>
