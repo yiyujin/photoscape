@@ -1338,7 +1338,7 @@ export default function Test8() {
       } }>
 
         {/* GRADIENT SIDE DIV */}
-        { isAudioReady && (
+        {/* { isAudioReady && (
           // <div style={{ position: 'absolute', left: "-95px", top: 0, width: '100px', height: '200%', zIndex: 999,
           //     background: swatchColor || 'transparent', transition: 'background 160ms ease',
           //     filter : "blur(40px)",
@@ -1353,7 +1353,7 @@ export default function Test8() {
               pointerEvents : "none",
             }}
           />
-        )}
+        )} */}
         
         {/* BUTTONS HERE */}
         <div style = { { position : "absolute", zIndex : 99, background : "", display : "flex" } }>
